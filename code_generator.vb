@@ -18,6 +18,7 @@ Sub main()
     
 End Sub
 
+
 Sub LetsGo(database_name As String, sheet_name As String, file_name As String, MaxNumberOfFieldsPerRow As Integer)
     
     Debug.Print "import sqlite3"
@@ -37,47 +38,43 @@ End Sub
 
 Sub create_add_table_to_database(sheet_name As String)
 
-    Dim row As Integer
     Dim ws As Worksheet
     Dim comma As String
+    Dim hasPK As Boolean
     Dim pk As String
-    
+    Dim field() As String
+    Dim numOfColumns As Integer
+    Dim row As Integer
+   
     Set ws = Worksheets(sheet_name)
     
+    'get the number of fields in table
+    numOfColumns = get_number_of_columns(sheet_name)
+    
+    'does this table have a Primary key
+    hasPK = does_table_have_PK(sheet_name)
+    
+    'build the primary key string of fields, comma separate
+    pk = build_primary_key(hasPK, ws)
+    
+    'build column_name datatype
+    field = build_column_names(hasPK, numOfColumns, ws)
+    
+    'def add_player_to_database(conn, cur):
     Debug.Print "def add_" & sheet_name & "_to_database(conn, cur):"
     Debug.Print
     
+    'cur.execute("""
     Debug.Print vbTab & "cur.execute(" & Chr(34) & Chr(34) & Chr(34)
-    Debug.Print vbTab & vbTab & "CREATE TABLE if not exists " & sheet_name
-    Debug.Print vbTab & vbTab & "("
     
-    numOfColumns = get_number_of_columns(sheet_name)
-    haspk = does_table_have_PK(sheet_name)
+    'create table if not exists player
+    Debug.Print TabOver(2) & "CREATE TABLE if not exists " & sheet_name
+    Debug.Print TabOver(2) & "("
     
-    row = 1
-    comma = ","
-    While ws.Cells(row, 1) <> ""
-    
-        If (haspk = False) Then
-            If (row = numOfColumns) Then
-                comma = ""
-            End If
-        End If
-        
-        If (haspk = True) Then
-            If (LCase$(ws.Cells(row, 3)) = "pk") Then
-                If (pk = "") Then
-                    pk = ws.Cells(row, 1)
-                Else
-                    pk = pk & "," & ws.Cells(row, 1)
-                End If
-            End If
-        End If
-        
-        Debug.Print TabOver(3) & ws.Cells(row, 1) & vbTab & vbTab & ws.Cells(row, 2) & comma
-        row = row + 1
-    Wend
-    
+    'loop over all the fields
+    For i = 1 To numOfColumns
+        Debug.Print TabOver(3) & field(i)
+    Next i
     
     If (pk <> "") Then
         Debug.Print TabOver(3) & "PRIMARY KEY (" & pk & ")"
@@ -90,6 +87,64 @@ Sub create_add_table_to_database(sheet_name As String)
     Debug.Print
     
 End Sub
+
+Function build_primary_key(hasPK As Boolean, ws As Worksheet) As String
+
+    Dim row As Integer
+    Dim pk As String
+    
+    row = 1
+    pk = ""
+    
+    If (hasPK = True) Then
+        While ws.Cells(row, 1) <> ""
+            
+            If (hasPK = True) Then
+                If (LCase$(ws.Cells(row, 3)) = "pk") Then
+                    If (pk = "") Then
+                        pk = ws.Cells(row, 1)
+                    Else
+                        pk = pk & "," & ws.Cells(row, 1)
+                    End If
+                End If
+            End If
+            row = row + 1
+        Wend
+    End If
+    
+    If (hasPK = True) Then
+        build_primary_key = pk
+    Else
+        build_primary_key = ""
+    End If
+    
+End Function
+
+
+Function build_column_names(hasPK As Boolean, numOfColumns As Integer, ws As Worksheet) As String()
+
+    Dim row As Integer
+    Dim pk As String
+    Dim comma As String
+    Dim field(1 To 250) As String
+    
+    row = 1
+    comma = ","
+    While ws.Cells(row, 1) <> ""
+    
+        'if this table DOES NOT HAVE a primary key
+        If (hasPK = False) Then
+            If (row = numOfColumns) Then
+                comma = ""
+            End If
+        End If
+        
+        field(row) = ws.Cells(row, 1) & vbTab & vbTab & ws.Cells(row, 2) & comma
+        row = row + 1
+    Wend
+    
+    build_column_names = field
+End Function
 
 Sub create_csv_load_table(sheet_name As String, max_num_field_per_row As Integer)
     
@@ -109,16 +164,6 @@ Sub create_csv_load_table(sheet_name As String, max_num_field_per_row As Integer
     Dim cnt As Integer
     Dim comma As String
     Dim i As Integer
-    
-    Debug.Print "def load_" & sheet_name & "(conn, cur, filename):"
-    Debug.Print
-    Debug.Print vbTab & "with open(filename,""r"") as fh:"
-    Debug.Print
-    Debug.Print TabOver(2) & "reader = csv.reader(fh, delimiter=',')"
-    Debug.Print
-    Debug.Print TabOver(2) & "# if the file DOES NOT have a header row use this line"
-    Debug.Print TabOver(2) & "next(csv.reader(fh), None)  # skip first row"
-    Debug.Print
     
     
     index = 1
@@ -149,6 +194,21 @@ Sub create_csv_load_table(sheet_name As String, max_num_field_per_row As Integer
         End If
     Next i
     
+    
+    
+    Debug.Print "def load_" & sheet_name & "(conn, cur, filename):"
+    Debug.Print
+    Debug.Print vbTab & "with open(filename,""r"") as fh:"
+    Debug.Print
+    Debug.Print TabOver(2) & "reader = csv.reader(fh, delimiter=',')"
+    Debug.Print
+    Debug.Print TabOver(2) & "# if the file DOES NOT have a header row use this line"
+    Debug.Print TabOver(2) & "next(csv.reader(fh), None)  # skip first row"
+    Debug.Print
+    
+    Debug.Print
+    Debug.Print TabOver(2) & "stmt = " & Chr(34) & "insert into " & sheet_name & "(" & Chr(34)
+    
     Debug.Print
     Debug.Print TabOver(2) & "stmt = " & Chr(34) & "insert into " & sheet_name & "(" & Chr(34)
     For i = 1 To index
@@ -173,7 +233,6 @@ Sub create_csv_load_table(sheet_name As String, max_num_field_per_row As Integer
     Debug.Print
     
     
-  
     For i = 1 To index
         If (i = 1) Then
             Debug.Print TabOver(4) & "record = (";
@@ -287,14 +346,5 @@ Function does_table_have_PK(sheetName As String) As Boolean
     End If
     
 End Function
-
-
-
-
-
-
-
-
-
 
 
